@@ -1,0 +1,81 @@
+import datetime
+
+from pydantic import BaseModel, Field
+
+
+class BlueprintOut(BaseModel):
+    printify_id: int
+    title: str
+    brand: str
+    model: str
+    images: list[str] = Field(default_factory=list)
+
+    model_config = {"protected_namespaces": ()}
+
+
+class PrintProviderOut(BaseModel):
+    printify_id: int
+    title: str
+
+
+class VariantOut(BaseModel):
+    id: int
+    title: str
+    price_cents: int | None = None
+    is_available: bool = True
+    options: dict = Field(default_factory=dict)
+
+
+class PrintAreaOut(BaseModel):
+    position: str
+    width_px: int
+    height_px: int
+
+
+class VariantCatalogOut(BaseModel):
+    variants: list[VariantOut]
+    print_areas: list[PrintAreaOut]
+
+
+class DesignOut(BaseModel):
+    id: int
+    original_filename: str
+    width: int
+    height: int
+    url: str
+    created_at: datetime.datetime
+
+    model_config = {"from_attributes": True}
+
+
+class Placement(BaseModel):
+    position: str
+    x: float = 0.5  # 0..1, fraction of print-area width, center point
+    y: float = 0.5  # 0..1, fraction of print-area height, center point
+    scale: float = 1.0
+    angle: float = 0.0
+
+
+class ProductCreateRequest(BaseModel):
+    title: str
+    design_id: int
+    blueprint_id: int
+    print_provider_id: int
+    variant_ids: list[int]
+    price_cents: int
+    placements: list[Placement] | None = None
+    description: str = ""
+
+
+class ProductOut(BaseModel):
+    id: int
+    title: str
+    design_id: int
+    blueprint_printify_id: int
+    print_provider_printify_id: int
+    printify_product_id: str | None
+    status: str
+    error: str | None
+    created_at: datetime.datetime
+
+    model_config = {"from_attributes": True}
