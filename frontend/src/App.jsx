@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { api } from './api'
+import PlacementEditor, { defaultPlacement } from './PlacementEditor'
 import './index.css'
 
-const STEPS = ['Artwork', 'Product', 'Print provider', 'Variants & price', 'Done']
+const STEPS = ['Artwork', 'Product', 'Print provider', 'Variants & price', 'Placement', 'Done']
 
 function centsToDollars(cents) {
   return (cents / 100).toFixed(2)
@@ -31,6 +32,8 @@ export default function App() {
   const [selectedVariantIds, setSelectedVariantIds] = useState(new Set())
   const [title, setTitle] = useState('')
   const [priceDollars, setPriceDollars] = useState('20.00')
+
+  const [placement, setPlacement] = useState(defaultPlacement('front'))
 
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState('')
@@ -104,6 +107,8 @@ export default function App() {
     try {
       const catalog = await api.getVariantCatalog(selectedBlueprint.printify_id, provider.printify_id)
       setVariantCatalog(catalog)
+      const defaultArea = catalog.print_areas.find((a) => a.position === 'front') ?? catalog.print_areas[0]
+      setPlacement(defaultPlacement(defaultArea?.position ?? 'front'))
     } catch (err) {
       setCreateError(err.message)
     } finally {
@@ -131,9 +136,10 @@ export default function App() {
         print_provider_id: selectedProvider.printify_id,
         variant_ids: Array.from(selectedVariantIds),
         price_cents: Math.round(parseFloat(priceDollars) * 100),
+        placements: [placement],
       })
       setCreatedProduct(product)
-      setStep(4)
+      setStep(5)
     } catch (err) {
       setCreateError(err.message)
     } finally {
@@ -148,6 +154,7 @@ export default function App() {
     setSelectedProvider(null)
     setVariantCatalog(null)
     setSelectedVariantIds(new Set())
+    setPlacement(defaultPlacement('front'))
     setCreatedProduct(null)
     setCreateError('')
   }
@@ -286,11 +293,8 @@ export default function App() {
                     />
                   </label>
                 </div>
-                <button
-                  disabled={selectedVariantIds.size === 0 || creating || !title}
-                  onClick={handleCreateProduct}
-                >
-                  {creating ? 'Creating draft…' : `Create draft product (${selectedVariantIds.size} variants)`}
+                <button disabled={selectedVariantIds.size === 0 || !title} onClick={() => setStep(4)}>
+                  Next: position artwork →
                 </button>
               </>
             )}
@@ -300,7 +304,45 @@ export default function App() {
           </section>
         )}
 
-        {step === 4 && createdProduct && (
+        {step === 4 && (
+          <section className="card">
+            <h2>5. Position artwork</h2>
+            {variantCatalog?.print_areas.length > 1 && (
+              <div className="form-row">
+                <label>
+                  Print area
+                  <select
+                    value={placement.position}
+                    onChange={(e) => setPlacement(defaultPlacement(e.target.value))}
+                  >
+                    {variantCatalog.print_areas.map((a) => (
+                      <option key={a.position} value={a.position}>
+                        {a.position}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            )}
+            {variantCatalog && design && (
+              <PlacementEditor
+                printArea={variantCatalog.print_areas.find((a) => a.position === placement.position)}
+                design={design}
+                placement={placement}
+                onChange={setPlacement}
+              />
+            )}
+            {createError && <p className="error">{createError}</p>}
+            <button disabled={creating} onClick={handleCreateProduct}>
+              {creating ? 'Creating draft…' : `Create draft product (${selectedVariantIds.size} variants)`}
+            </button>
+            <button className="back" onClick={() => setStep(3)}>
+              ← Back
+            </button>
+          </section>
+        )}
+
+        {step === 5 && createdProduct && (
           <section className="card">
             <h2>🎉 Draft product created</h2>
             <p>

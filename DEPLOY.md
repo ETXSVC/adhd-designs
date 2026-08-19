@@ -185,9 +185,9 @@ cd ../frontend && npm install && npm run build
 
 ## Known gaps (see README for details)
 
-- No drag/scale/rotate UI for artwork placement yet — placements default to
-  dead-center, full-scale on the print area. The backend API already
-  accepts per-position `x`/`y`/`scale`/`angle`.
+- Artwork placement supports one print position per product; multiple
+  positions (front + back) would need frontend work, though the API
+  already accepts a list of placements.
 - `catalog_parser.py` reads Printify's `placeholders[].width/height` field
   names as documented; worth eyeballing the response of your first real
   sync in case Printify has changed that shape since.

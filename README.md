@@ -57,12 +57,12 @@ this on a real server alongside an existing site.
 
 ## Known gaps
 
-- **Artwork placement**: no drag/scale/rotate UI yet. Every print area
-  currently gets the design centered and scaled to fit, full size. The
-  backend already accepts explicit `x`/`y`/`scale`/`angle` per print-area
-  position via `ProductCreateRequest.placements` (see `backend/app/schemas.py`)
-  — wiring up a canvas editor (Fabric.js/Konva) on the frontend to set
-  those is the natural next step.
+- **Artwork placement**: the frontend now has a drag/scale/rotate editor
+  (`frontend/src/PlacementEditor.jsx`, plain pointer events + CSS, no canvas
+  library) for a single print position per product. `ProductCreateRequest.placements`
+  (see `backend/app/schemas.py`) already accepts a list, so supporting
+  multiple print positions (e.g. front + back) per product is additive work,
+  not a breaking change.
 - **Printify schema assumptions**: `backend/app/services/catalog_parser.py`
   reads print-area pixel dimensions from `variant.placeholders[].width` /
   `.height`, matching Printify's documented API shape. Printify's API does

@@ -9,7 +9,7 @@ from app.database import get_db
 from app.models import Design, Product
 from app.schemas import Placement, ProductCreateRequest, ProductOut
 from app.services.catalog_parser import placeholders_for_variant
-from app.services.image_processing import fit_to_print_area
+from app.services.image_processing import compose_print_area
 from app.services.printify_client import PrintifyClient, PrintifyError
 
 router = APIRouter(prefix="/api/products", tags=["products"])
@@ -61,20 +61,23 @@ def create_product(payload: ProductCreateRequest, db: Session = Depends(get_db))
                         status_code=400,
                         detail=f"Print area '{placement.position}' is not available for the selected variant",
                     )
-                resized = fit_to_print_area(source_bytes, area["width"], area["height"])
+                resized = compose_print_area(
+                    source_bytes,
+                    area["width"],
+                    area["height"],
+                    x=placement.x,
+                    y=placement.y,
+                    scale=placement.scale,
+                    angle=placement.angle,
+                )
                 uploaded = client.upload_image(f"{design.original_filename}-{placement.position}.png", resized)
                 placeholders.append(
                     {
                         "position": placement.position,
-                        "images": [
-                            {
-                                "id": uploaded["id"],
-                                "x": placement.x,
-                                "y": placement.y,
-                                "scale": placement.scale,
-                                "angle": placement.angle,
-                            }
-                        ],
+                        # The placement transform is already baked into `resized`
+                        # above, so Printify is told to place it at native size,
+                        # centered, unrotated.
+                        "images": [{"id": uploaded["id"], "x": 0.5, "y": 0.5, "scale": 1, "angle": 0}],
                     }
                 )
 
