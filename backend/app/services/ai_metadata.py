@@ -17,8 +17,8 @@ from app.config import get_settings
 
 class GeneratedMetadata(BaseModel):
     title: str = Field(description="A short, punchy, SEO-friendly title, under 70 characters")
-    description: str = Field(description="A 2-4 sentence marketing description")
-    tags: list[str] = Field(description="5-10 lowercase search tags/keywords, no leading '#'")
+    description: str = Field(description="A 4-6 sentence SEO optimized marketing description")
+    tags: list[str] = Field(description="10-14 relevant lowercase SEO optimized search tags/keywords, no leading '#'")
 
 
 def _client() -> anthropic.Anthropic:
