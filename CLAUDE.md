@@ -182,13 +182,18 @@ Two entry points, both in that file:
 
 - `generate_design_metadata` — describes the artwork alone. Wired to
   `POST /api/designs/{id}/ai-metadata`, which **persists** the result onto
-  `Design.ai_title`/`ai_description`/`ai_tags`. The frontend renders this
-  as editable fields (not read-only text) with a "Save changes" button that
-  calls `PATCH /api/designs/{id}` (`DesignMetadataUpdate` schema, always
-  writes the full `{ai_title, ai_description, ai_tags}` set — no
-  partial-patch semantics) — generated copy is a starting point, not a
-  final answer, and needs to be correctable before anything downstream
-  relies on it.
+  `Design.ai_title`/`ai_description`/`ai_tags`, and `PATCH /api/designs/{id}`
+  (`DesignMetadataUpdate` schema, always writes the full
+  `{ai_title, ai_description, ai_tags}` set — no partial-patch semantics)
+  for correcting it afterward. Both endpoints are still live and working,
+  but as of the "Remove redundant AI-metadata generator from the
+  upload-artwork step" commit there is **no frontend UI wired to either
+  one** — the upload-artwork step's "✨ Suggest title, description & tags"
+  button and its editable fields were removed as a duplicate of
+  `generate_product_metadata` below (`api.generateDesignMetadata` /
+  `api.updateDesignMetadata` in `frontend/src/api.js` are now unused). If a
+  future need re-introduces per-design (not per-product-listing) AI copy,
+  the backend is already there — it just needs a frontend entry point again.
 - `generate_product_metadata` — takes a blueprint title too (looked up from
   the cached `Blueprint` row, so `/api/catalog/sync` must have run first)
   and writes e-commerce-listing-flavored copy. Wired to
