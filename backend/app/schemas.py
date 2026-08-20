@@ -1,6 +1,6 @@
 import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class BlueprintOut(BaseModel):
@@ -49,9 +49,27 @@ class DesignOut(BaseModel):
     width: int
     height: int
     url: str
+    ai_title: str | None = None
+    ai_description: str | None = None
+    ai_tags: list[str] = Field(default_factory=list)
     created_at: datetime.datetime
 
     model_config = {"from_attributes": True}
+
+    # `ai_tags` is a nullable JSON column (NULL until AI metadata is
+    # generated) but the API contract always returns a list, never null.
+    _default_tags = field_validator("ai_tags", mode="before")(lambda v: v or [])
+
+
+class AIMetadataOut(BaseModel):
+    title: str
+    description: str
+    tags: list[str]
+
+
+class ProductAIMetadataRequest(BaseModel):
+    design_id: int
+    blueprint_id: int
 
 
 class Placement(BaseModel):
@@ -71,6 +89,9 @@ class ProductCreateRequest(BaseModel):
     price_cents: int
     placements: list[Placement] | None = None
     description: str = ""
+    # Printify doesn't accept custom tags on product create/update -- these
+    # are stored locally for reference only (see Product.ai_tags).
+    tags: list[str] = Field(default_factory=list)
 
 
 class ProductOut(BaseModel):
@@ -82,6 +103,8 @@ class ProductOut(BaseModel):
     printify_product_id: str | None
     status: str
     error: str | None
+    ai_tags: list[str] = Field(default_factory=list)
     created_at: datetime.datetime
 
     model_config = {"from_attributes": True}
+    _default_tags = field_validator("ai_tags", mode="before")(lambda v: v or [])

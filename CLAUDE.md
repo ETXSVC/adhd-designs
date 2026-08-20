@@ -139,7 +139,44 @@ after `create_all`, is the pattern for that instead: inspect the table,
 and if a column is missing, run a guarded `ALTER TABLE ... ADD COLUMN`.
 It's idempotent (checks column presence before altering) so it's safe to
 run on every startup. Follow this same pattern for the next schema change
-rather than reaching for Alembic.
+rather than reaching for Alembic. New columns go in the `_LIGHT_MIGRATIONS`
+list in `database.py` — append, never edit a row that's already shipped.
+
+### AI-generated title/description/tags
+
+`services/ai_metadata.py` calls the Anthropic API (Claude Haiku 4.5 by
+default — `ANTHROPIC_MODEL` in `.env`, deliberately the cheap tier since
+this is a short vision + structured-output call, not a task that needs a
+frontier model) with the design image and `output_format=GeneratedMetadata`
+(a Pydantic model) via `client.messages.parse(...)`, so the response is
+guaranteed-parsed `{title, description, tags}` — no manual JSON parsing.
+Two entry points, both in that file:
+
+- `generate_design_metadata` — describes the artwork alone. Wired to
+  `POST /api/designs/{id}/ai-metadata`, which **persists** the result onto
+  `Design.ai_title`/`ai_description`/`ai_tags`.
+- `generate_product_metadata` — takes a blueprint title too (looked up from
+  the cached `Blueprint` row, so `/api/catalog/sync` must have run first)
+  and writes e-commerce-listing-flavored copy. Wired to
+  `POST /api/products/ai-metadata`, which is **not persisted** — it just
+  returns suggested title/description/tags for the frontend to prefill
+  into the create-product form (`App.jsx`'s "Generate title, description &
+  tags with AI" button in the variants-and-price step), and the user edits
+  before submitting.
+
+**Printify's product create/update API does not accept a `tags` field** —
+confirmed against the OpenAPI spec: `tags` only appears in the *response*
+schema (read-only/catalog-derived), not `createProductRequest` or
+`updateProductRequest`. `ProductCreateRequest.tags` and `Product.ai_tags`
+exist purely so generated tags are saved in our own DB for the user's
+reference (e.g. to copy into Shopify by hand later, since Shopify does
+support product tags) — they are never sent to Printify. `title` and
+`description` *are* genuinely accepted by Printify's create endpoint and do
+get forwarded in `create_product` (`routers/products.py`).
+
+Missing `ANTHROPIC_API_KEY` raises `RuntimeError` inside `ai_metadata.py`,
+which both routers turn into a 400 (not a 500) — the rest of the app works
+fine without this key set; it's an optional feature, not a hard dependency.
 
 ### Raw-JSON caching pattern
 

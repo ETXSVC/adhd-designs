@@ -104,11 +104,16 @@ button.back {
 
 input[type='text'],
 input[type='number'],
-input[type='search'] {
+input[type='search'],
+textarea {
   font: inherit;
   padding: 0.5rem;
   border-radius: 8px;
   border: 1px solid var(--border);
+}
+
+textarea {
+  resize: vertical;
 }
 
 .toolbar {
@@ -216,6 +221,33 @@ input[type='search'] {
   flex-direction: column;
   gap: 0.3rem;
   font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.form-row-full {
+  flex: 1 1 100%;
+}
+
+.ai-metadata {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  margin: 0.75rem 0;
+}
+
+.tag-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.tag-chip {
+  font-size: 0.8rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  background: var(--card);
+  border: 1px solid var(--border);
   color: var(--muted);
 }
 

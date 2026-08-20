@@ -1,13 +1,15 @@
 from pathlib import Path
 
+import anthropic
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.database import get_db
-from app.models import Design, Product
-from app.schemas import Placement, ProductCreateRequest, ProductOut
+from app.models import Blueprint, Design, Product
+from app.schemas import AIMetadataOut, Placement, ProductAIMetadataRequest, ProductCreateRequest, ProductOut
+from app.services.ai_metadata import generate_product_metadata
 from app.services.catalog_parser import placeholders_for_variant
 from app.services.image_processing import compose_print_area
 from app.services.printify_client import PrintifyClient, PrintifyError
@@ -27,6 +29,31 @@ def _default_placements(raw_variant_catalog: dict, reference_variant_id: int) ->
         raise HTTPException(status_code=400, detail="Selected variant has no print areas for this print provider")
     front = next((a for a in areas if a.get("position") == "front"), areas[0])
     return [Placement(position=front["position"])]
+
+
+@router.post("/ai-metadata", response_model=AIMetadataOut)
+def generate_product_ai_metadata(payload: ProductAIMetadataRequest, db: Session = Depends(get_db)) -> AIMetadataOut:
+    design = db.get(Design, payload.design_id)
+    if not design:
+        raise HTTPException(status_code=404, detail="Design not found")
+
+    blueprint = db.scalar(select(Blueprint).where(Blueprint.printify_id == payload.blueprint_id))
+    if not blueprint:
+        raise HTTPException(status_code=404, detail="Blueprint not found. Call POST /api/catalog/sync first.")
+
+    settings = get_settings()
+    design_path = settings.upload_path / design.stored_filename
+    if not design_path.exists():
+        raise HTTPException(status_code=404, detail="Design file missing on disk")
+
+    try:
+        metadata = generate_product_metadata(design_path.read_bytes(), design.content_type, blueprint.title)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except anthropic.APIStatusError as exc:
+        raise HTTPException(status_code=502, detail=f"Anthropic API error: {exc.message}") from exc
+
+    return AIMetadataOut(title=metadata.title, description=metadata.description, tags=metadata.tags)
 
 
 @router.post("", response_model=ProductOut, status_code=201)
@@ -103,6 +130,7 @@ def create_product(payload: ProductCreateRequest, db: Session = Depends(get_db))
             print_provider_printify_id=payload.print_provider_id,
             status="failed",
             error=error_message,
+            ai_tags=payload.tags,
         )
         db.add(product)
         db.commit()
@@ -116,6 +144,7 @@ def create_product(payload: ProductCreateRequest, db: Session = Depends(get_db))
         printify_product_id=str(response.get("id")),
         status="created",
         raw=response,
+        ai_tags=payload.tags,
     )
     db.add(product)
     db.commit()

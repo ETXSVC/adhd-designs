@@ -31,6 +31,13 @@ export const api = {
     formData.append('file', file)
     return request('/api/designs/upload', { method: 'POST', body: formData })
   },
+  generateDesignMetadata: (designId) => request(`/api/designs/${designId}/ai-metadata`, { method: 'POST' }),
+  generateProductMetadata: (designId, blueprintId) =>
+    request('/api/products/ai-metadata', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ design_id: designId, blueprint_id: blueprintId }),
+    }),
   createProduct: (payload) =>
     request('/api/products', {
       method: 'POST',

@@ -16,6 +16,8 @@ export default function App() {
   const [design, setDesign] = useState(null)
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState('')
+  const [designAiLoading, setDesignAiLoading] = useState(false)
+  const [designAiError, setDesignAiError] = useState('')
 
   const [blueprintQuery, setBlueprintQuery] = useState('')
   const [categories, setCategories] = useState([])
@@ -36,6 +38,10 @@ export default function App() {
   const [variantsLoading, setVariantsLoading] = useState(false)
   const [selectedVariantIds, setSelectedVariantIds] = useState(new Set())
   const [title, setTitle] = useState('')
+  const [description, setDescription] = useState('')
+  const [tagsInput, setTagsInput] = useState('')
+  const [productAiLoading, setProductAiLoading] = useState(false)
+  const [productAiError, setProductAiError] = useState('')
   const [priceDollars, setPriceDollars] = useState('20.00')
 
   const [placement, setPlacement] = useState(defaultPlacement('front'))
@@ -56,6 +62,33 @@ export default function App() {
       setUploadError(err.message)
     } finally {
       setUploading(false)
+    }
+  }
+
+  async function handleGenerateDesignMetadata() {
+    setDesignAiLoading(true)
+    setDesignAiError('')
+    try {
+      setDesign(await api.generateDesignMetadata(design.id))
+    } catch (err) {
+      setDesignAiError(err.message)
+    } finally {
+      setDesignAiLoading(false)
+    }
+  }
+
+  async function handleGenerateProductMetadata() {
+    setProductAiLoading(true)
+    setProductAiError('')
+    try {
+      const metadata = await api.generateProductMetadata(design.id, selectedBlueprint.printify_id)
+      setTitle(metadata.title)
+      setDescription(metadata.description)
+      setTagsInput(metadata.tags.join(', '))
+    } catch (err) {
+      setProductAiError(err.message)
+    } finally {
+      setProductAiLoading(false)
     }
   }
 
@@ -174,6 +207,11 @@ export default function App() {
         variant_ids: Array.from(selectedVariantIds),
         price_cents: Math.round(parseFloat(priceDollars) * 100),
         placements: [placement],
+        description,
+        tags: tagsInput
+          .split(',')
+          .map((t) => t.trim())
+          .filter(Boolean),
       })
       setCreatedProduct(product)
       setStep(5)
@@ -192,6 +230,8 @@ export default function App() {
     setVariantCatalog(null)
     setSelectedVariantIds(new Set())
     setPlacement(defaultPlacement('front'))
+    setDescription('')
+    setTagsInput('')
     setCreatedProduct(null)
     setCreateError('')
   }
@@ -222,6 +262,27 @@ export default function App() {
                 <p>
                   {design.original_filename} — {design.width}×{design.height}px
                 </p>
+                <button type="button" onClick={handleGenerateDesignMetadata} disabled={designAiLoading}>
+                  {designAiLoading ? 'Asking AI…' : '✨ Suggest title, description & tags'}
+                </button>
+                {designAiError && <p className="error">{designAiError}</p>}
+                {design.ai_title && (
+                  <div className="ai-metadata">
+                    <p>
+                      <strong>{design.ai_title}</strong>
+                    </p>
+                    <p className="muted">{design.ai_description}</p>
+                    {design.ai_tags.length > 0 && (
+                      <div className="tag-chips">
+                        {design.ai_tags.map((tag) => (
+                          <span key={tag} className="tag-chip">
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
                 <button
                   onClick={() => {
                     setStep(1)
@@ -339,6 +400,10 @@ export default function App() {
                     </label>
                   ))}
                 </div>
+                <button type="button" onClick={handleGenerateProductMetadata} disabled={productAiLoading}>
+                  {productAiLoading ? 'Asking AI…' : '✨ Generate title, description & tags with AI'}
+                </button>
+                {productAiError && <p className="error">{productAiError}</p>}
                 <div className="form-row">
                   <label>
                     Product title
@@ -353,6 +418,18 @@ export default function App() {
                       value={priceDollars}
                       onChange={(e) => setPriceDollars(e.target.value)}
                     />
+                  </label>
+                </div>
+                <div className="form-row">
+                  <label className="form-row-full">
+                    Description
+                    <textarea rows="3" value={description} onChange={(e) => setDescription(e.target.value)} />
+                  </label>
+                </div>
+                <div className="form-row">
+                  <label className="form-row-full">
+                    Tags (comma-separated — saved for your reference; Printify's API doesn't accept custom tags)
+                    <input value={tagsInput} onChange={(e) => setTagsInput(e.target.value)} placeholder="funny, cat, astronaut" />
                   </label>
                 </div>
                 <button disabled={selectedVariantIds.size === 0 || !title} onClick={() => setStep(4)}>

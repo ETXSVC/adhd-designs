@@ -26,6 +26,13 @@ written so switching to Postgres later is just a `DATABASE_URL` change.
    a **draft** product — nothing is published or sold until you review it
    in Printify and push it to Shopify yourself.
 
+Optionally, at any point after uploading, click "✨ Suggest title,
+description & tags" (for the design itself) or "✨ Generate title,
+description & tags with AI" (for the product listing, once a blueprint is
+picked) to have Claude draft copy from the artwork — requires
+`ANTHROPIC_API_KEY` in `.env`; the rest of the app works without it. Tags
+are saved locally only — Printify's API doesn't accept custom tags.
+
 ## Local development
 
 Backend:
