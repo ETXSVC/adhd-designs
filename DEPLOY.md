@@ -103,16 +103,47 @@ npm install
 npm run build
 ```
 
-This produces `adhd-designs/frontend/dist/`. Point Nginx at it (step 5).
+This produces `adhd-designs/frontend/dist/`. Point Nginx at it directly if
+you can (see step 5's preferred option) — **that requires editing the
+Nginx vhost, which needs root**. If you don't have root (or the vhost's
+`root` is fixed elsewhere, e.g. a Virtualmin-managed `public_html` and you
+only want to touch app-owned files), copy the build into whatever
+directory Nginx already serves for `/` instead:
 
-Whenever you change frontend code, re-run `npm run build` and it's live —
-no service to restart.
+```bash
+rsync -a --delete dist/assets/ /path/to/served/root/assets/
+cp dist/index.html dist/favicon.svg /path/to/served/root/
+```
+
+**Never `rsync --delete` (or otherwise wipe) the whole served root** if
+anything besides this app's build might live there — on a Virtualmin
+vhost, `public_html` commonly also holds AWStats' `icon/` directory,
+`awstats-icon`/`awstatsicons` symlinks, and an `awstats/` reports
+directory; a blanket `--delete` sync will silently delete all of it. Scope
+`--delete` to the build's own `assets/` subdirectory only (that one *is*
+exclusively Vite's hashed output — old hashed bundles there are safe, and
+correct, to prune on every deploy) and plain-copy the few top-level files.
+
+Whenever you change frontend code, re-run `npm run build` and redeploy with
+the copy above — no service to restart. **If you skip the copy step, the
+new build sits in `frontend/dist/` but the live site keeps serving
+whatever was last copied — this has actually happened:** several commits'
+worth of frontend work (pagination, category filters, AI-metadata UI) were
+built successfully but the copy step was missed, so the live site kept
+serving a much older build for hours while `frontend/dist/` silently moved
+on. Check what's actually live with `curl -s https://yourdomain/ | grep -o
+'index-[A-Za-z0-9]*\.\(js\|css\)'` and compare the hash against
+`frontend/dist/index.html` (or a listing of `frontend/dist/assets/`) if a
+change doesn't seem to have taken effect — don't assume `npm run build`
+alone is enough.
 
 ## 5. Nginx
 
-Add this inside your existing server block for the domain (alongside
-whatever PHP `location` block Virtualmin already generated — this doesn't
-replace it, it adds two new `location`s):
+**Preferred, if you have root:** point Nginx's `root` for `location /`
+directly at `adhd-designs/frontend/dist` so every `npm run build` is live
+with no copy step. Add this inside your existing server block for the
+domain (alongside whatever PHP `location` block Virtualmin already
+generated — this doesn't replace it, it adds two new `location`s):
 
 ```nginx
     # adhd-designs frontend (static build)
@@ -149,6 +180,25 @@ Test and reload:
 ```bash
 sudo nginx -t
 sudo systemctl reload nginx
+```
+
+### This server, specifically
+
+On `app.adhd-designs.com` (Virtualmin), the vhost's `root` is fixed at
+`/home/app.adhd-designs.com/public_html` (set once at the top of the
+server block, shared with the PHP `fastcgi_param DOCUMENT_ROOT`) — nobody
+has added a `location`-level `root` override for `frontend/dist`, and
+doing so needs root to edit `/etc/nginx/sites-available/app.adhd-designs.com.conf`
+and reload. Until/unless that's done, every frontend deploy is the copy
+step from step 4, targeting `public_html` (an app-owned directory — no
+sudo needed for the copy itself, just don't `--delete` the whole thing;
+see the AWStats warning above, which is specifically about this
+directory):
+
+```bash
+cd adhd-designs/frontend && npm run build
+rsync -a --delete dist/assets/ /home/app.adhd-designs.com/public_html/assets/
+cp dist/index.html dist/favicon.svg /home/app.adhd-designs.com/public_html/
 ```
 
 ## 6. First run

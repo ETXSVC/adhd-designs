@@ -23,9 +23,37 @@ in `backend/app/config.py`).
 
 This app is deployed and running live (systemd unit `adhd-designs`, gunicorn
 behind Nginx per `DEPLOY.md`) — changes to `backend/` require restarting that
-service (`sudo systemctl restart adhd-designs`) to take effect, and changes
-to `frontend/` require `npm run build` to regenerate `frontend/dist/` (no
-restart needed, Nginx serves it directly as static files).
+service (`sudo systemctl restart adhd-designs`) to take effect.
+
+**Frontend deploys need an extra step on this server — `npm run build`
+alone is NOT enough, and this has actually bitten a session before.**
+Nginx's `root` for this vhost is `/home/app.adhd-designs.com/public_html`
+(Virtualmin-managed), **not** `frontend/dist` — despite what a first read
+of `DEPLOY.md` used to imply. `frontend/dist/` is just a build output
+directory; nothing serves it directly unless someone edits the Nginx vhost
+(needs root) to point there. Until that's done, every frontend change
+needs:
+
+```bash
+cd frontend && npm run build
+rsync -a --delete dist/assets/ /home/app.adhd-designs.com/public_html/assets/
+cp dist/index.html dist/favicon.svg /home/app.adhd-designs.com/public_html/
+```
+
+**Never `rsync --delete` (or otherwise wipe) all of `public_html`** — it
+also holds AWStats' `icon/` directory (hundreds of files), the
+`awstats-icon`/`awstatsicons` symlinks, and an `awstats/` reports
+directory, none of which belong to this app. Scope `--delete` to
+`assets/` only (exclusively Vite's hashed output — safe and correct to
+fully replace on every deploy) and plain-copy the two top-level files.
+Full incident + recovery notes: `DEPLOY.md` § "This server, specifically."
+
+To check what's actually live vs. what's sitting unbuilt-and-uncopied:
+
+```bash
+curl -s https://app.adhd-designs.com/ | grep -o 'index-[A-Za-z0-9]*\.\(js\|css\)'
+ls frontend/dist/assets/   # compare the hash
+```
 
 ## Commands
 
@@ -42,7 +70,7 @@ Frontend (from `frontend/`):
 
 ```bash
 npm run dev      # Vite dev server on :5173, proxies /api and /uploads to :8000 (see vite.config.js)
-npm run build    # production build -> frontend/dist/, what Nginx serves
+npm run build    # production build -> frontend/dist/ -- NOT what Nginx serves on this server; see the deploy note above
 npm run lint      # Oxlint, config in .oxlintrc.json
 ```
 
