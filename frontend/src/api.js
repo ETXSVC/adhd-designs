@@ -16,7 +16,11 @@ async function request(path, options = {}) {
 
 export const api = {
   syncCatalog: () => request('/api/catalog/sync', { method: 'POST' }),
-  listBlueprints: (q) => request(`/api/catalog/blueprints${q ? `?q=${encodeURIComponent(q)}` : ''}`),
+  listBlueprints: (q, { limit = 50, offset = 0 } = {}) => {
+    const params = new URLSearchParams({ limit, offset })
+    if (q) params.set('q', q)
+    return request(`/api/catalog/blueprints?${params}`)
+  },
   listPrintProviders: (blueprintId) => request(`/api/catalog/blueprints/${blueprintId}/print-providers`),
   getVariantCatalog: (blueprintId, providerId) =>
     request(`/api/catalog/blueprints/${blueprintId}/print-providers/${providerId}/variants`),

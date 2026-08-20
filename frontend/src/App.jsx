@@ -4,6 +4,7 @@ import PlacementEditor, { defaultPlacement } from './PlacementEditor'
 import './index.css'
 
 const STEPS = ['Artwork', 'Product', 'Print provider', 'Variants & price', 'Placement', 'Done']
+const BLUEPRINTS_PAGE_SIZE = 50
 
 function centsToDollars(cents) {
   return (cents / 100).toFixed(2)
@@ -20,6 +21,8 @@ export default function App() {
   const [blueprints, setBlueprints] = useState([])
   const [blueprintsLoading, setBlueprintsLoading] = useState(false)
   const [blueprintsError, setBlueprintsError] = useState('')
+  const [blueprintsHasMore, setBlueprintsHasMore] = useState(false)
+  const [blueprintsLoadingMore, setBlueprintsLoadingMore] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const [selectedBlueprint, setSelectedBlueprint] = useState(null)
 
@@ -58,13 +61,28 @@ export default function App() {
     setBlueprintsLoading(true)
     setBlueprintsError('')
     try {
-      const rows = await api.listBlueprints(query)
+      const rows = await api.listBlueprints(query, { limit: BLUEPRINTS_PAGE_SIZE, offset: 0 })
       setBlueprints(rows)
+      setBlueprintsHasMore(rows.length === BLUEPRINTS_PAGE_SIZE)
     } catch (err) {
       setBlueprintsError(err.message)
       setBlueprints([])
+      setBlueprintsHasMore(false)
     } finally {
       setBlueprintsLoading(false)
+    }
+  }
+
+  async function loadMoreBlueprints() {
+    setBlueprintsLoadingMore(true)
+    try {
+      const rows = await api.listBlueprints(blueprintQuery, { limit: BLUEPRINTS_PAGE_SIZE, offset: blueprints.length })
+      setBlueprints((prev) => [...prev, ...rows])
+      setBlueprintsHasMore(rows.length === BLUEPRINTS_PAGE_SIZE)
+    } catch (err) {
+      setBlueprintsError(err.message)
+    } finally {
+      setBlueprintsLoadingMore(false)
     }
   }
 
@@ -233,6 +251,11 @@ export default function App() {
                 </button>
               ))}
             </div>
+            {blueprintsHasMore && (
+              <button onClick={loadMoreBlueprints} disabled={blueprintsLoadingMore}>
+                {blueprintsLoadingMore ? 'Loading…' : `Load more (showing ${blueprints.length})`}
+              </button>
+            )}
             <button className="back" onClick={() => setStep(0)}>
               ← Back
             </button>
