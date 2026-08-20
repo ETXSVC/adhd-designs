@@ -16,13 +16,6 @@ export default function App() {
   const [design, setDesign] = useState(null)
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState('')
-  const [designAiLoading, setDesignAiLoading] = useState(false)
-  const [designAiError, setDesignAiError] = useState('')
-  const [designTitleDraft, setDesignTitleDraft] = useState('')
-  const [designDescriptionDraft, setDesignDescriptionDraft] = useState('')
-  const [designTagsDraft, setDesignTagsDraft] = useState('')
-  const [designSaving, setDesignSaving] = useState(false)
-  const [designSaveError, setDesignSaveError] = useState('')
 
   const [blueprintQuery, setBlueprintQuery] = useState('')
   const [categories, setCategories] = useState([])
@@ -67,42 +60,6 @@ export default function App() {
       setUploadError(err.message)
     } finally {
       setUploading(false)
-    }
-  }
-
-  async function handleGenerateDesignMetadata() {
-    setDesignAiLoading(true)
-    setDesignAiError('')
-    try {
-      const updated = await api.generateDesignMetadata(design.id)
-      setDesign(updated)
-      setDesignTitleDraft(updated.ai_title || '')
-      setDesignDescriptionDraft(updated.ai_description || '')
-      setDesignTagsDraft(updated.ai_tags.join(', '))
-    } catch (err) {
-      setDesignAiError(err.message)
-    } finally {
-      setDesignAiLoading(false)
-    }
-  }
-
-  async function handleSaveDesignMetadata() {
-    setDesignSaving(true)
-    setDesignSaveError('')
-    try {
-      const updated = await api.updateDesignMetadata(design.id, {
-        ai_title: designTitleDraft,
-        ai_description: designDescriptionDraft,
-        ai_tags: designTagsDraft
-          .split(',')
-          .map((t) => t.trim())
-          .filter(Boolean),
-      })
-      setDesign(updated)
-    } catch (err) {
-      setDesignSaveError(err.message)
-    } finally {
-      setDesignSaving(false)
     }
   }
 
@@ -261,9 +218,6 @@ export default function App() {
     setPlacement(defaultPlacement('front'))
     setDescription('')
     setTagsInput('')
-    setDesignTitleDraft('')
-    setDesignDescriptionDraft('')
-    setDesignTagsDraft('')
     setCreatedProduct(null)
     setCreateError('')
   }
@@ -294,40 +248,6 @@ export default function App() {
                 <p>
                   {design.original_filename} — {design.width}×{design.height}px
                 </p>
-                <button type="button" onClick={handleGenerateDesignMetadata} disabled={designAiLoading}>
-                  {designAiLoading ? 'Asking AI…' : '✨ Suggest title, description & tags'}
-                </button>
-                {designAiError && <p className="error">{designAiError}</p>}
-                {design.ai_title && (
-                  <div className="ai-metadata">
-                    <div className="form-row">
-                      <label className="form-row-full">
-                        Title
-                        <input value={designTitleDraft} onChange={(e) => setDesignTitleDraft(e.target.value)} />
-                      </label>
-                    </div>
-                    <div className="form-row">
-                      <label className="form-row-full">
-                        Description
-                        <textarea
-                          rows="3"
-                          value={designDescriptionDraft}
-                          onChange={(e) => setDesignDescriptionDraft(e.target.value)}
-                        />
-                      </label>
-                    </div>
-                    <div className="form-row">
-                      <label className="form-row-full">
-                        Tags (comma-separated)
-                        <input value={designTagsDraft} onChange={(e) => setDesignTagsDraft(e.target.value)} />
-                      </label>
-                    </div>
-                    {designSaveError && <p className="error">{designSaveError}</p>}
-                    <button type="button" onClick={handleSaveDesignMetadata} disabled={designSaving}>
-                      {designSaving ? 'Saving…' : 'Save changes'}
-                    </button>
-                  </div>
-                )}
                 <button
                   onClick={() => {
                     setStep(1)
