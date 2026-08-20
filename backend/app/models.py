@@ -22,6 +22,7 @@ class Blueprint(Base):
     title: Mapped[str] = mapped_column(String, index=True)
     brand: Mapped[str] = mapped_column(String, default="")
     model: Mapped[str] = mapped_column(String, default="")
+    category: Mapped[str] = mapped_column(String, default="", index=True)
     raw: Mapped[dict] = mapped_column(JSON)
     synced_at: Mapped[datetime.datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
@@ -71,6 +72,9 @@ class Design(Base):
     content_type: Mapped[str] = mapped_column(String)
     width: Mapped[int] = mapped_column(Integer)
     height: Mapped[int] = mapped_column(Integer)
+    ai_title: Mapped[str] = mapped_column(String, nullable=True)
+    ai_description: Mapped[str] = mapped_column(String, nullable=True)
+    ai_tags: Mapped[list] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     products: Mapped[list["Product"]] = relationship(back_populates="design")
@@ -91,6 +95,10 @@ class Product(Base):
     printify_product_id: Mapped[str] = mapped_column(String, nullable=True)
     status: Mapped[str] = mapped_column(String, default="pending")  # pending|created|failed
     error: Mapped[str] = mapped_column(String, nullable=True)
+    # Printify's API doesn't accept custom tags on create or update (tags in
+    # its product schema are read-only/derived from the catalog), so these
+    # are stored here for our own reference only -- never sent to Printify.
+    ai_tags: Mapped[list] = mapped_column(JSON, nullable=True)
     raw: Mapped[dict] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 

@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { api } from './api'
+import PlacementEditor, { defaultPlacement } from './PlacementEditor'
 import './index.css'
 
-const STEPS = ['Artwork', 'Product', 'Print provider', 'Variants & price', 'Done']
+const STEPS = ['Artwork', 'Product', 'Print provider', 'Variants & price', 'Placement', 'Done']
+const BLUEPRINTS_PAGE_SIZE = 50
 
 function centsToDollars(cents) {
   return (cents / 100).toFixed(2)
@@ -16,9 +18,13 @@ export default function App() {
   const [uploadError, setUploadError] = useState('')
 
   const [blueprintQuery, setBlueprintQuery] = useState('')
+  const [categories, setCategories] = useState([])
+  const [selectedCategory, setSelectedCategory] = useState('')
   const [blueprints, setBlueprints] = useState([])
   const [blueprintsLoading, setBlueprintsLoading] = useState(false)
   const [blueprintsError, setBlueprintsError] = useState('')
+  const [blueprintsHasMore, setBlueprintsHasMore] = useState(false)
+  const [blueprintsLoadingMore, setBlueprintsLoadingMore] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const [selectedBlueprint, setSelectedBlueprint] = useState(null)
 
@@ -30,7 +36,13 @@ export default function App() {
   const [variantsLoading, setVariantsLoading] = useState(false)
   const [selectedVariantIds, setSelectedVariantIds] = useState(new Set())
   const [title, setTitle] = useState('')
+  const [description, setDescription] = useState('')
+  const [tagsInput, setTagsInput] = useState('')
+  const [productAiLoading, setProductAiLoading] = useState(false)
+  const [productAiError, setProductAiError] = useState('')
   const [priceDollars, setPriceDollars] = useState('20.00')
+
+  const [placement, setPlacement] = useState(defaultPlacement('front'))
 
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState('')
@@ -51,18 +63,65 @@ export default function App() {
     }
   }
 
-  async function loadBlueprints(query) {
+  async function handleGenerateProductMetadata() {
+    setProductAiLoading(true)
+    setProductAiError('')
+    try {
+      const metadata = await api.generateProductMetadata(design.id, selectedBlueprint.printify_id)
+      setTitle(metadata.title)
+      setDescription(metadata.description)
+      setTagsInput(metadata.tags.join(', '))
+    } catch (err) {
+      setProductAiError(err.message)
+    } finally {
+      setProductAiLoading(false)
+    }
+  }
+
+  async function loadBlueprints(query, category = selectedCategory) {
     setBlueprintsLoading(true)
     setBlueprintsError('')
     try {
-      const rows = await api.listBlueprints(query)
+      const rows = await api.listBlueprints(query, { limit: BLUEPRINTS_PAGE_SIZE, offset: 0, category })
       setBlueprints(rows)
+      setBlueprintsHasMore(rows.length === BLUEPRINTS_PAGE_SIZE)
     } catch (err) {
       setBlueprintsError(err.message)
       setBlueprints([])
+      setBlueprintsHasMore(false)
     } finally {
       setBlueprintsLoading(false)
     }
+  }
+
+  async function loadMoreBlueprints() {
+    setBlueprintsLoadingMore(true)
+    try {
+      const rows = await api.listBlueprints(blueprintQuery, {
+        limit: BLUEPRINTS_PAGE_SIZE,
+        offset: blueprints.length,
+        category: selectedCategory,
+      })
+      setBlueprints((prev) => [...prev, ...rows])
+      setBlueprintsHasMore(rows.length === BLUEPRINTS_PAGE_SIZE)
+    } catch (err) {
+      setBlueprintsError(err.message)
+    } finally {
+      setBlueprintsLoadingMore(false)
+    }
+  }
+
+  async function loadCategories() {
+    try {
+      setCategories(await api.listCategories())
+    } catch {
+      // category filter is optional UI sugar; a failure here shouldn't block browsing
+    }
+  }
+
+  function chooseCategory(category) {
+    setSelectedCategory(category)
+    loadBlueprints(blueprintQuery, category)
   }
 
   async function handleSync() {
@@ -70,7 +129,7 @@ export default function App() {
     setBlueprintsError('')
     try {
       await api.syncCatalog()
-      await loadBlueprints(blueprintQuery)
+      await Promise.all([loadBlueprints(blueprintQuery), loadCategories()])
     } catch (err) {
       setBlueprintsError(err.message)
     } finally {
@@ -104,6 +163,8 @@ export default function App() {
     try {
       const catalog = await api.getVariantCatalog(selectedBlueprint.printify_id, provider.printify_id)
       setVariantCatalog(catalog)
+      const defaultArea = catalog.print_areas.find((a) => a.position === 'front') ?? catalog.print_areas[0]
+      setPlacement(defaultPlacement(defaultArea?.position ?? 'front'))
     } catch (err) {
       setCreateError(err.message)
     } finally {
@@ -131,9 +192,15 @@ export default function App() {
         print_provider_id: selectedProvider.printify_id,
         variant_ids: Array.from(selectedVariantIds),
         price_cents: Math.round(parseFloat(priceDollars) * 100),
+        placements: [placement],
+        description,
+        tags: tagsInput
+          .split(',')
+          .map((t) => t.trim())
+          .filter(Boolean),
       })
       setCreatedProduct(product)
-      setStep(4)
+      setStep(5)
     } catch (err) {
       setCreateError(err.message)
     } finally {
@@ -148,6 +215,9 @@ export default function App() {
     setSelectedProvider(null)
     setVariantCatalog(null)
     setSelectedVariantIds(new Set())
+    setPlacement(defaultPlacement('front'))
+    setDescription('')
+    setTagsInput('')
     setCreatedProduct(null)
     setCreateError('')
   }
@@ -182,6 +252,7 @@ export default function App() {
                   onClick={() => {
                     setStep(1)
                     if (blueprints.length === 0) loadBlueprints('')
+                    if (categories.length === 0) loadCategories()
                   }}
                 >
                   Next: choose a product →
@@ -208,6 +279,25 @@ export default function App() {
                 {syncing ? 'Syncing…' : 'Sync catalog from Printify'}
               </button>
             </div>
+            {categories.length > 0 && (
+              <div className="category-pills">
+                <button
+                  className={selectedCategory === '' ? 'category-pill active' : 'category-pill'}
+                  onClick={() => chooseCategory('')}
+                >
+                  All
+                </button>
+                {categories.map((c) => (
+                  <button
+                    key={c.category}
+                    className={selectedCategory === c.category ? 'category-pill active' : 'category-pill'}
+                    onClick={() => chooseCategory(c.category)}
+                  >
+                    {c.category} ({c.count})
+                  </button>
+                ))}
+              </div>
+            )}
             {blueprintsLoading && <p>Loading…</p>}
             {blueprintsError && (
               <p className="error">
@@ -226,6 +316,11 @@ export default function App() {
                 </button>
               ))}
             </div>
+            {blueprintsHasMore && (
+              <button onClick={loadMoreBlueprints} disabled={blueprintsLoadingMore}>
+                {blueprintsLoadingMore ? 'Loading…' : `Load more (showing ${blueprints.length})`}
+              </button>
+            )}
             <button className="back" onClick={() => setStep(0)}>
               ← Back
             </button>
@@ -270,6 +365,10 @@ export default function App() {
                     </label>
                   ))}
                 </div>
+                <button type="button" onClick={handleGenerateProductMetadata} disabled={productAiLoading}>
+                  {productAiLoading ? 'Asking AI…' : '✨ Generate title, description & tags with AI'}
+                </button>
+                {productAiError && <p className="error">{productAiError}</p>}
                 <div className="form-row">
                   <label>
                     Product title
@@ -286,11 +385,20 @@ export default function App() {
                     />
                   </label>
                 </div>
-                <button
-                  disabled={selectedVariantIds.size === 0 || creating || !title}
-                  onClick={handleCreateProduct}
-                >
-                  {creating ? 'Creating draft…' : `Create draft product (${selectedVariantIds.size} variants)`}
+                <div className="form-row">
+                  <label className="form-row-full">
+                    Description
+                    <textarea rows="3" value={description} onChange={(e) => setDescription(e.target.value)} />
+                  </label>
+                </div>
+                <div className="form-row">
+                  <label className="form-row-full">
+                    Tags (comma-separated — saved for your reference; Printify's API doesn't accept custom tags)
+                    <input value={tagsInput} onChange={(e) => setTagsInput(e.target.value)} placeholder="funny, cat, astronaut" />
+                  </label>
+                </div>
+                <button disabled={selectedVariantIds.size === 0 || !title} onClick={() => setStep(4)}>
+                  Next: position artwork →
                 </button>
               </>
             )}
@@ -300,7 +408,45 @@ export default function App() {
           </section>
         )}
 
-        {step === 4 && createdProduct && (
+        {step === 4 && (
+          <section className="card">
+            <h2>5. Position artwork</h2>
+            {variantCatalog?.print_areas.length > 1 && (
+              <div className="form-row">
+                <label>
+                  Print area
+                  <select
+                    value={placement.position}
+                    onChange={(e) => setPlacement(defaultPlacement(e.target.value))}
+                  >
+                    {variantCatalog.print_areas.map((a) => (
+                      <option key={a.position} value={a.position}>
+                        {a.position}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            )}
+            {variantCatalog && design && (
+              <PlacementEditor
+                printArea={variantCatalog.print_areas.find((a) => a.position === placement.position)}
+                design={design}
+                placement={placement}
+                onChange={setPlacement}
+              />
+            )}
+            {createError && <p className="error">{createError}</p>}
+            <button disabled={creating} onClick={handleCreateProduct}>
+              {creating ? 'Creating draft…' : `Create draft product (${selectedVariantIds.size} variants)`}
+            </button>
+            <button className="back" onClick={() => setStep(3)}>
+              ← Back
+            </button>
+          </section>
+        )}
+
+        {step === 5 && createdProduct && (
           <section className="card">
             <h2>🎉 Draft product created</h2>
             <p>
