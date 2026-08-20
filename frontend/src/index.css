@@ -236,21 +236,6 @@ textarea {
   margin: 0.75rem 0;
 }
 
-.tag-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-}
-
-.tag-chip {
-  font-size: 0.8rem;
-  padding: 0.2rem 0.6rem;
-  border-radius: 999px;
-  background: var(--card);
-  border: 1px solid var(--border);
-  color: var(--muted);
-}
-
 .placement-editor {
   margin-bottom: 1.25rem;
 }

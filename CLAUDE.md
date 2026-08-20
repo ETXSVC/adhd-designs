@@ -154,7 +154,13 @@ Two entry points, both in that file:
 
 - `generate_design_metadata` — describes the artwork alone. Wired to
   `POST /api/designs/{id}/ai-metadata`, which **persists** the result onto
-  `Design.ai_title`/`ai_description`/`ai_tags`.
+  `Design.ai_title`/`ai_description`/`ai_tags`. The frontend renders this
+  as editable fields (not read-only text) with a "Save changes" button that
+  calls `PATCH /api/designs/{id}` (`DesignMetadataUpdate` schema, always
+  writes the full `{ai_title, ai_description, ai_tags}` set — no
+  partial-patch semantics) — generated copy is a starting point, not a
+  final answer, and needs to be correctable before anything downstream
+  relies on it.
 - `generate_product_metadata` — takes a blueprint title too (looked up from
   the cached `Blueprint` row, so `/api/catalog/sync` must have run first)
   and writes e-commerce-listing-flavored copy. Wired to

@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.database import get_db
 from app.models import Design
-from app.schemas import DesignOut
+from app.schemas import DesignMetadataUpdate, DesignOut
 from app.services.ai_metadata import generate_design_metadata
 from app.services.image_processing import read_dimensions
 
@@ -104,6 +104,25 @@ def generate_design_ai_metadata(design_id: int, db: Session = Depends(get_db)) -
     design.ai_title = metadata.title
     design.ai_description = metadata.description
     design.ai_tags = metadata.tags
+    db.commit()
+    db.refresh(design)
+    return _to_out(design)
+
+
+@router.patch("/{design_id}", response_model=DesignOut)
+def update_design_metadata(design_id: int, payload: DesignMetadataUpdate, db: Session = Depends(get_db)) -> DesignOut:
+    """Saves user edits to the AI-suggested (or manually typed) title/
+    description/tags -- lets the generated copy be corrected before it's
+    relied on elsewhere, rather than being stuck with whatever the model
+    first produced."""
+
+    design = db.get(Design, design_id)
+    if not design:
+        raise HTTPException(status_code=404, detail="Design not found")
+
+    design.ai_title = payload.ai_title
+    design.ai_description = payload.ai_description
+    design.ai_tags = payload.ai_tags
     db.commit()
     db.refresh(design)
     return _to_out(design)

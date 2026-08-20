@@ -61,6 +61,16 @@ class DesignOut(BaseModel):
     _default_tags = field_validator("ai_tags", mode="before")(lambda v: v or [])
 
 
+class DesignMetadataUpdate(BaseModel):
+    """User edits to AI-suggested (or manually entered) design metadata --
+    always writes the full set, no partial-patch semantics, since the
+    frontend form always has a value (even '') for every field."""
+
+    ai_title: str = ""
+    ai_description: str = ""
+    ai_tags: list[str] = Field(default_factory=list)
+
+
 class AIMetadataOut(BaseModel):
     title: str
     description: str
