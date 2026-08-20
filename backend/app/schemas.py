@@ -8,9 +8,15 @@ class BlueprintOut(BaseModel):
     title: str
     brand: str
     model: str
+    category: str = ""
     images: list[str] = Field(default_factory=list)
 
     model_config = {"protected_namespaces": ()}
+
+
+class CategoryOut(BaseModel):
+    category: str
+    count: int
 
 
 class PrintProviderOut(BaseModel):

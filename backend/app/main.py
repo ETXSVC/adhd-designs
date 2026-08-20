@@ -3,12 +3,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.config import get_settings
-from app.database import Base, engine
+from app.database import Base, engine, run_light_migrations
 from app.routers import catalog, designs, products
 
 settings = get_settings()
 
 Base.metadata.create_all(bind=engine)
+run_light_migrations()
 
 app = FastAPI(title="adhd-designs API")
 

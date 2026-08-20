@@ -16,11 +16,13 @@ async function request(path, options = {}) {
 
 export const api = {
   syncCatalog: () => request('/api/catalog/sync', { method: 'POST' }),
-  listBlueprints: (q, { limit = 50, offset = 0 } = {}) => {
+  listBlueprints: (q, { limit = 50, offset = 0, category = '' } = {}) => {
     const params = new URLSearchParams({ limit, offset })
     if (q) params.set('q', q)
+    if (category) params.set('category', category)
     return request(`/api/catalog/blueprints?${params}`)
   },
+  listCategories: () => request('/api/catalog/categories'),
   listPrintProviders: (blueprintId) => request(`/api/catalog/blueprints/${blueprintId}/print-providers`),
   getVariantCatalog: (blueprintId, providerId) =>
     request(`/api/catalog/blueprints/${blueprintId}/print-providers/${providerId}/variants`),

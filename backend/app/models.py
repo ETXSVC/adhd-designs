@@ -22,6 +22,7 @@ class Blueprint(Base):
     title: Mapped[str] = mapped_column(String, index=True)
     brand: Mapped[str] = mapped_column(String, default="")
     model: Mapped[str] = mapped_column(String, default="")
+    category: Mapped[str] = mapped_column(String, default="", index=True)
     raw: Mapped[dict] = mapped_column(JSON)
     synced_at: Mapped[datetime.datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 

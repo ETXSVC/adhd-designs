@@ -12,8 +12,69 @@ def blueprint_summary(raw: dict) -> dict:
         "title": raw.get("title", ""),
         "brand": raw.get("brand", ""),
         "model": raw.get("model", ""),
+        "category": guess_category(raw.get("title", "")),
         "images": raw.get("images", []),
     }
+
+
+# Printify's `/catalog/blueprints.json` doesn't return a category/taxonomy
+# field -- this list is the full flat catalog. `guess_category` buckets
+# blueprints by matching keywords against the title text instead, since
+# titles consistently name the product type (e.g. "11oz Accent Mug",
+# "Unisex Heavy Cotton Tee"). It's a heuristic, not an authoritative
+# taxonomy: order matters (more specific rules first, e.g. hoodies/
+# sweatshirts before the generic shirts bucket, since "sweatshirt" also
+# contains "shirt"), and anything that matches nothing falls into "Other".
+CATEGORY_RULES: list[tuple[str, list[str]]] = [
+    ("Hoodies & Sweatshirts", ["hoodie", "sweatshirt", "sweater", "crewneck", "fleece"]),
+    (
+        "Mugs & Drinkware",
+        [
+            "mug", "tumbler", "wine glass", "water bottle", "beer stein", "flask", "pint glass", "cup",
+            "insulated bottle", "can cooler", "beverage holder", "can glass", "shot glass",
+        ],
+    ),
+    (
+        "Cases & Covers",
+        ["phone case", "iphone", "samsung galaxy", "airpod", "laptop case", "laptop sleeve", "tablet case", "wallet case"],
+    ),
+    ("Bags", ["tote", "backpack", "fanny pack", "drawstring bag", " bag", "duffel", "pouch"]),
+    (
+        "Hats & Headwear",
+        ["beanie", "bucket hat", "trucker", "flatbill", "snapback", "visor", "headband", "panel gramps", "-panel", " hat", " cap"],
+    ),
+    ("Posters & Wall Art", ["poster", "canvas", "wall art", "tapestry", "framed print", "wall decal", "acrylic print", "wall clock"]),
+    ("Stickers & Decals", ["sticker", "decal", "magnet"]),
+    (
+        "Stationery & Office",
+        ["notebook", "journal", "calendar", "planner", "greeting card", "sticky note", "mouse pad", "puzzle", "business card", "bookmark", "board book"],
+    ),
+    ("Jewelry & Accessories", ["necklace", "bracelet", "earring", "keychain", "engraved ring"]),
+    (
+        "Home & Living",
+        [
+            "pillow", "blanket", "towel", "rug", "doormat", "cutting board", "ornament", "candle", "coaster",
+            "bath mat", "serving tray", "acrylic sign", "table sign", "bottle opener", "throw", "vase",
+        ],
+    ),
+    ("Outerwear & Workwear", ["jacket", "vest", "jersey"]),
+    ("Car Accessories", ["car mat", "car floor mat", "air freshener"]),
+    ("Baby & Kids", ["baby", "onesie", "bodysuit", "toddler", "bib"]),
+    ("Face Masks", ["face mask"]),
+    ("Socks", ["sock"]),
+    ("Dresses & Skirts", ["dress", "skirt"]),
+    ("Bottoms & Loungewear", ["shorts", "sweatpants", "leggings", "pajama", "joggers"]),
+    ("Pet Products", ["pet bandana", "dog bandana", "pet bowl"]),
+    ("T-Shirts & Tops", ["tee", "t-shirt", "tank top", "shirt", "top", "polo"]),
+]
+
+
+def guess_category(title: str) -> str:
+    lowered = f" {title.lower()} "
+    for category, keywords in CATEGORY_RULES:
+        if any(keyword in lowered for keyword in keywords):
+            return category
+    return "Other"
 
 
 def print_provider_summary(raw: dict) -> dict:

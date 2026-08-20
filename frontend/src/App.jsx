@@ -18,6 +18,8 @@ export default function App() {
   const [uploadError, setUploadError] = useState('')
 
   const [blueprintQuery, setBlueprintQuery] = useState('')
+  const [categories, setCategories] = useState([])
+  const [selectedCategory, setSelectedCategory] = useState('')
   const [blueprints, setBlueprints] = useState([])
   const [blueprintsLoading, setBlueprintsLoading] = useState(false)
   const [blueprintsError, setBlueprintsError] = useState('')
@@ -57,11 +59,11 @@ export default function App() {
     }
   }
 
-  async function loadBlueprints(query) {
+  async function loadBlueprints(query, category = selectedCategory) {
     setBlueprintsLoading(true)
     setBlueprintsError('')
     try {
-      const rows = await api.listBlueprints(query, { limit: BLUEPRINTS_PAGE_SIZE, offset: 0 })
+      const rows = await api.listBlueprints(query, { limit: BLUEPRINTS_PAGE_SIZE, offset: 0, category })
       setBlueprints(rows)
       setBlueprintsHasMore(rows.length === BLUEPRINTS_PAGE_SIZE)
     } catch (err) {
@@ -76,7 +78,11 @@ export default function App() {
   async function loadMoreBlueprints() {
     setBlueprintsLoadingMore(true)
     try {
-      const rows = await api.listBlueprints(blueprintQuery, { limit: BLUEPRINTS_PAGE_SIZE, offset: blueprints.length })
+      const rows = await api.listBlueprints(blueprintQuery, {
+        limit: BLUEPRINTS_PAGE_SIZE,
+        offset: blueprints.length,
+        category: selectedCategory,
+      })
       setBlueprints((prev) => [...prev, ...rows])
       setBlueprintsHasMore(rows.length === BLUEPRINTS_PAGE_SIZE)
     } catch (err) {
@@ -86,12 +92,25 @@ export default function App() {
     }
   }
 
+  async function loadCategories() {
+    try {
+      setCategories(await api.listCategories())
+    } catch {
+      // category filter is optional UI sugar; a failure here shouldn't block browsing
+    }
+  }
+
+  function chooseCategory(category) {
+    setSelectedCategory(category)
+    loadBlueprints(blueprintQuery, category)
+  }
+
   async function handleSync() {
     setSyncing(true)
     setBlueprintsError('')
     try {
       await api.syncCatalog()
-      await loadBlueprints(blueprintQuery)
+      await Promise.all([loadBlueprints(blueprintQuery), loadCategories()])
     } catch (err) {
       setBlueprintsError(err.message)
     } finally {
@@ -207,6 +226,7 @@ export default function App() {
                   onClick={() => {
                     setStep(1)
                     if (blueprints.length === 0) loadBlueprints('')
+                    if (categories.length === 0) loadCategories()
                   }}
                 >
                   Next: choose a product →
@@ -233,6 +253,25 @@ export default function App() {
                 {syncing ? 'Syncing…' : 'Sync catalog from Printify'}
               </button>
             </div>
+            {categories.length > 0 && (
+              <div className="category-pills">
+                <button
+                  className={selectedCategory === '' ? 'category-pill active' : 'category-pill'}
+                  onClick={() => chooseCategory('')}
+                >
+                  All
+                </button>
+                {categories.map((c) => (
+                  <button
+                    key={c.category}
+                    className={selectedCategory === c.category ? 'category-pill active' : 'category-pill'}
+                    onClick={() => chooseCategory(c.category)}
+                  >
+                    {c.category} ({c.count})
+                  </button>
+                ))}
+              </div>
+            )}
             {blueprintsLoading && <p>Loading…</p>}
             {blueprintsError && (
               <p className="error">

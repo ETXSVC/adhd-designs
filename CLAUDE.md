@@ -100,6 +100,47 @@ curl -X POST http://127.0.0.1:8000/api/catalog/sync
      error body is still written, so failed attempts are visible via
      `GET /api/products`.
 
+### Browsing the catalog: pagination and categories
+
+`GET /api/catalog/blueprints` takes `limit`/`offset`/`q`/`category` and
+defaults to `limit=50` — the frontend must paginate (`App.jsx`'s "Load
+more" button, tracking `blueprintsHasMore`/offset via `blueprints.length`)
+rather than assuming one call returns the whole catalog. This was a real
+bug once already: the frontend called the endpoint with no limit/offset at
+all, so browsing silently showed only the first 50 of ~2060 blueprints even
+though `/api/catalog/sync` had correctly pulled all of them into SQLite.
+If blueprints ever seem to be "missing" again, check the frontend's
+pagination first, not the sync.
+
+Printify's `/catalog/blueprints.json` has no category/taxonomy field —
+`category` on `Blueprint` (and the `GET /api/catalog/categories` endpoint
+used for the filter pills in `App.jsx`) is a heuristic derived purely from
+matching keywords against each blueprint's title, in `guess_category` /
+`CATEGORY_RULES` (`services/catalog_parser.py`). Rule order matters (more
+specific categories must be checked before broader ones that would
+false-positive on a substring, e.g. "Hoodies & Sweatshirts" before
+"T-Shirts & Tops" since "sweatshirt" contains "shirt"). It's tuned against
+the live catalog (~2060 blueprints) to keep the "Other" bucket under ~20%,
+not to be exhaustive — expect a long tail of niche products to land in
+"Other", and improve `CATEGORY_RULES` incrementally if a category you care
+about is under-represented, rather than trying to cover everything at
+once. `category` is computed in `blueprint_summary` and written on every
+`POST /api/catalog/sync`, so **re-run sync once after deploying a
+`CATEGORY_RULES` change** to backfill it onto already-synced rows — there's
+no separate backfill script.
+
+### Schema changes without Alembic
+
+There's no migration framework here (SQLite, intentionally small app).
+`Base.metadata.create_all()` in `main.py` only creates tables that don't
+exist yet — it silently does nothing for a new column on an existing
+table. `database.run_light_migrations()`, also called from `main.py` right
+after `create_all`, is the pattern for that instead: inspect the table,
+and if a column is missing, run a guarded `ALTER TABLE ... ADD COLUMN`.
+It's idempotent (checks column presence before altering) so it's safe to
+run on every startup. Follow this same pattern for the next schema change
+rather than reaching for Alembic.
+
 ### Raw-JSON caching pattern
 
 `Blueprint`, `PrintProvider`, and `VariantCatalog` (`models.py`) each store
